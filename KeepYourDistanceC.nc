@@ -31,12 +31,13 @@ module KeepYourDistanceC @safe() {
   }
 }
 
-implementation{
+implementation {
 	message_t packet;
 	uint8_t previous_message_id = -1;
 	uint8_t same_id_counter = 0;
 	bool locked;
 
+	// --------- Boot.booted() ---------
 	event void Boot.booted() {
     call AMControl.start();
   }
@@ -48,7 +49,7 @@ implementation{
   		call MilliTimer.startPeriodic(500);
   	} else {
   		printf("ERR1\n");
-  		call.AMControl.start(); // start AMControl again in case of error
+  		call AMControl.start(); // start AMControl again in case of error
   	}
   }
 
@@ -89,17 +90,17 @@ implementation{
   			if (same_id_counter > 9) { // print even if received more than 10 consecutive msgs
   				printf("%u %u", TOS_NODE_ID, previous_message_id);
   			}
-  		} else { // non consecutive msg
-  			same_id_counter = 0; // reset counter
-  			previous_message_id = rcm->sender_id; // update previous msg id
+  			} else { // non consecutive msg
+  				same_id_counter = 0; // reset counter
+  				previous_message_id = rcm->sender_id; // update previous msg id
+  			}
   		}
   	}
 
-  	// --------- AMSend.sendDone() ---------
-  	event void AMSend.sendDone(message_t* bufPtr, error_t error) {
-    	if (&packet == bufPtr) {
-      	locked = FALSE;
-    	}
-  	}
-
+  // --------- AMSend.sendDone() ---------
+  event void AMSend.sendDone(message_t* bufPtr, error_t error) {
+    if (&packet == bufPtr) {
+ 	  	locked = FALSE;
+    }
   }
+}
