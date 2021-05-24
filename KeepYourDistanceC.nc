@@ -71,6 +71,7 @@ implementation {
   		// include the sender id in the message
   		rcm->sender_id = TOS_NODE_ID;
   		// send it in broadcast
+  		//printf("Mote #%u: sending\n", TOS_NODE_ID);
   		if (call AMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(kyd_msg_t)) == SUCCESS) {
 				locked = TRUE;
 	    }
@@ -80,22 +81,21 @@ implementation {
   // --------- Receive.receive() ---------
   event message_t* Receive.receive(message_t* bufPtr, void* payload, uint8_t len) {
   	if (len != sizeof(kyd_msg_t)) {
-  		return bufPtr;
   		printf("ERR3\n");
   	} else {
   		kyd_msg_t* rcm = (kyd_msg_t*)payload;
-
   		if (rcm->sender_id == previous_message_id) { // consecutive msg
   			same_id_counter++; // update the counter
   			if (same_id_counter > 9) { // print even if received more than 10 consecutive msgs
-  				printf("%u %u", TOS_NODE_ID, previous_message_id);
+  				printf("%u %u\n", TOS_NODE_ID, previous_message_id);
   			}
-  			} else { // non consecutive msg
-  				same_id_counter = 0; // reset counter
-  				previous_message_id = rcm->sender_id; // update previous msg id
-  			}
+  		} else { // non consecutive msg
+  			same_id_counter = 0; // reset counter
+  			previous_message_id = rcm->sender_id; // update previous msg id
   		}
   	}
+  	return bufPtr;
+  }
 
   // --------- AMSend.sendDone() ---------
   event void AMSend.sendDone(message_t* bufPtr, error_t error) {
