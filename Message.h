@@ -9,6 +9,7 @@
 
 typedef nx_struct kyd_msg {
 	nx_uint8_t sender_id;
+	nx_uint16_t msg_n;
 } kyd_msg_t;
 
 enum {

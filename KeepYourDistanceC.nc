@@ -35,16 +35,17 @@ module KeepYourDistanceC @safe() {
 
 implementation {
 	message_t packet;
-	uint8_t received_from[MOTE_NUMBER];
+	uint16_t previous_msg_n[MOTE_NUMBER];
+	uint16_t n = 1;
 	uint8_t counters[MOTE_NUMBER];
 	uint8_t i;
 	bool locked;
 
 	// --------- Boot.booted() ---------
 	event void Boot.booted() {
-		// initialize counters and received_from elements to 0
+		// initialize counters previous_msg_n elements to 0
 		for (i=0; i<MOTE_NUMBER; i++)
-			received_from[i] = 0;
+			previous_msg_n[i] = 0;
 		for (i=0; i<MOTE_NUMBER; i++)
 			counters[i] = 0;
 
@@ -68,26 +69,6 @@ implementation {
 
   // --------- MilliTimer.fired() ---------
   event void MilliTimer.fired() {
-  	// check if received and update counters
-  	for (i=0; i<MOTE_NUMBER; i++) {
-  		if (received_from[i] == 1) {
-  			counters[i]++;
-  		} else {
-  			counters[i] = 0;
-  		}
-  	}
-
-  	// ALARM
-  	for (i=0; i<MOTE_NUMBER; i++) {
-	  	if (counters[i] > 9) { // alarm condition 10 msgs in row
-	  		printf("%u %u\n", TOS_NODE_ID, i+1); // trigger the alarm
-	  	}
-	  }
-
-  	// reset received_from array
-  	for (i=0; i<MOTE_NUMBER; i++) 
-  		received_from[i] = 0;
-
   	// SENDING BROADCAST MSG
   	if (locked) {
   		printf("ERR2\n");
@@ -102,6 +83,15 @@ implementation {
 
   		// include the sender id in the message
   		rcm->sender_id = TOS_NODE_ID;
+
+  		rcm->msg_n = n;
+  		// increase n or reset
+  		if (n == 2^16 - 1) {
+  			n=0;
+  		} else {
+  			n++;
+  		}
+
   		// send it in broadcast
   		//printf("Mote #%u: sending\n", TOS_NODE_ID);
   		if (call AMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(kyd_msg_t)) == SUCCESS) {
@@ -118,7 +108,12 @@ implementation {
   	} else {
   		kyd_msg_t* rcm = (kyd_msg_t*)payload;
   		if (rcm->sender_id >= 0 && rcm->sender_id < MOTE_NUMBER+1) {
-  			received_from[rcm->sender_id-1] = 1;
+  			if (rcm->msg_n == previous_msg_n[rcm->sender_id-1] + 1) { // check if consecutive
+  				counters[i-1] = counters[i-1] + 1;
+  			} else {
+  				counters[i-1] = 0;
+  			}
+  			previous_msg_n[rcm->sender_id-1] = rcm->msg_n;
   		} else {
   			printf("ERR4 %u\n", rcm->sender_id); // mote ID not expected
   		}
