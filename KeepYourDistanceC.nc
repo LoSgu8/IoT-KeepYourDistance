@@ -20,7 +20,8 @@
 #include "Timer.h"
 #include "printf.h"
 #include "Message.h"
-#define MOTE_NUMBER 3
+
+#define MOTE_NUMBER 15
 
 module KeepYourDistanceC @safe() {
 	uses {
@@ -35,15 +36,15 @@ module KeepYourDistanceC @safe() {
 
 implementation {
 	message_t packet;
-	uint16_t previous_msg_n[MOTE_NUMBER];
-	uint16_t n = 1;
-	uint8_t counters[MOTE_NUMBER];
+	uint16_t previous_msg_n[MOTE_NUMBER]; // previous_msg_n[i-1] stores the last msg_n received from mote i
+	uint16_t n = 1; // local msg_n to be sent each time Timer fires
+	uint8_t counters[MOTE_NUMBER]; // counters[i-1] stores the number of consecutive msgs received from mote i
 	uint8_t i;
 	bool locked;
 
 	// --------- Boot.booted() ---------
 	event void Boot.booted() {
-		// initialize counters previous_msg_n elements to 0
+		// initialize counters and previous_msg_n elements to 0
 		for (i=0; i<MOTE_NUMBER; i++)
 			previous_msg_n[i] = 0;
 		for (i=0; i<MOTE_NUMBER; i++)
@@ -58,7 +59,7 @@ implementation {
   		// starts a periodic 500ms Timer
   		call MilliTimer.startPeriodic(500);
   	} else {
-  		printf("ERR1\n");
+  		//printf("ERR1\n");
   		call AMControl.start(); // start AMControl again in case of error
   	}
   }
@@ -71,7 +72,7 @@ implementation {
   event void MilliTimer.fired() {
   	// SENDING BROADCAST MSG
   	if (locked) {
-  		printf("ERR2\n");
+  		//printf("ERR2\n");
   		return;
   	} else {
 
@@ -85,15 +86,13 @@ implementation {
   		rcm->sender_id = TOS_NODE_ID;
 
   		rcm->msg_n = n;
-  		// increase n or reset
-  		if (n == 2^16 - 1) {
-  			n=0;
-  		} else {
-  			n++;
-  		}
-
+  		
+  		n++; // if it reaches 2^16-1 restarts from 0
+  		// ATTENTION: the reset of n could lead to false alarms
+  		// to minimize the probability of their occurence I used an unint16_t instead of an uint_8_t
+  		
+  		
   		// send it in broadcast
-  		//printf("Mote #%u: sending\n", TOS_NODE_ID);
   		if (call AMSend.send(AM_BROADCAST_ADDR, &packet, sizeof(kyd_msg_t)) == SUCCESS) {
 				locked = TRUE;
 	    }
@@ -103,19 +102,32 @@ implementation {
 
   // --------- Receive.receive() ---------
   event message_t* Receive.receive(message_t* bufPtr, void* payload, uint8_t len) {
+  	
   	if (len != sizeof(kyd_msg_t)) {
-  		printf("ERR3\n");
+  		//printf("ERR3\n");
   	} else {
   		kyd_msg_t* rcm = (kyd_msg_t*)payload;
   		if (rcm->sender_id >= 0 && rcm->sender_id < MOTE_NUMBER+1) {
+  			//printf("ID %u R %u P %u\n", rcm->sender_id, rcm->msg_n, previous_msg_n[rcm->sender_id-1]);
   			if (rcm->msg_n == previous_msg_n[rcm->sender_id-1] + 1) { // check if consecutive
-  				counters[i-1] = counters[i-1] + 1;
+  				if (counters[rcm->sender_id-1] == 255) { // to avoid false alarms when uint_8 restarts from 0, set it to 11 (no alarm)
+  					counters[rcm->sender_id-1] = 11;
+  					printf("W %u %u\n", TOS_NODE_ID, rcm->sender_id); // WARNING : motes remained close for a while despite the alarm
+  				} else {
+  					counters[rcm->sender_id-1] = counters[rcm->sender_id-1] + 1;
+  					//printf("C %u\n", counters[rcm->sender_id-1]);
+  				}
+  				
+  				if (counters[rcm->sender_id-1] == 10){
+  					
+  					printf("A %u %u\n", TOS_NODE_ID, rcm->sender_id); // ALARM TRIGGERED
+  				}
   			} else {
-  				counters[i-1] = 0;
+  				counters[rcm->sender_id-1] = 0;
   			}
   			previous_msg_n[rcm->sender_id-1] = rcm->msg_n;
   		} else {
-  			printf("ERR4 %u\n", rcm->sender_id); // mote ID not expected
+  			//printf("ERR4 %u\n", rcm->sender_id); // mote ID not expected
   		}
   	}
   	return bufPtr;
