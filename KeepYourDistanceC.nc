@@ -6,15 +6,16 @@
 */
 
 /*
+	When a mote is in the proximity area of another mote and receives 10
+	consecutive messages from that mote it prints "RECEIVERID SENDERID".
+	
 	Error descriptions:
 		- ERR1 AMControl not started successfully
 		- ERR2 MilliTimer fired but locked is true
 		- ERR3 length of the received msg is different from the kyd_msg_t
 			struct size
 		- ERR4 received a sender_id not in range(0,MOTE_NUMBER-1)
-
-	When a mote is in the proximity area of another mote and receives 10
-	consecutive messages from that mote it prints "RECEIVERID SENDERID".
+		- ERR5 the created kyd_msg_t* is NULL	
 */
 
 #include "Timer.h"
@@ -31,7 +32,7 @@ module KeepYourDistanceC @safe() {
     	interface AMSend;
     	interface SplitControl as AMControl;
     	interface Packet;
-  }
+  	}
 }
 
 implementation {
@@ -44,7 +45,7 @@ implementation {
 
 	// --------- Boot.booted() ---------
 	event void Boot.booted() {
-		// initialize counters and previous_msg_n elements to 0
+		// set all counters and previous_msg_n elements to 0
 		for (i=0; i<MOTE_NUMBER; i++)
 			previous_msg_n[i] = 0;
 		for (i=0; i<MOTE_NUMBER; i++)
@@ -72,13 +73,14 @@ implementation {
   event void MilliTimer.fired() {
   	// SENDING BROADCAST MSG
   	if (locked) {
-  		//printf("ERR2\n");
+  		printf("ERR2\n");
   		return;
   	} else {
 
   		kyd_msg_t* rcm = (kyd_msg_t*)call Packet.getPayload(&packet, sizeof(kyd_msg_t));
 
   		if (rcm == NULL) {
+  			printf("ERR5\n");
   			return; // ERR
   		}
 
@@ -104,15 +106,15 @@ implementation {
   event message_t* Receive.receive(message_t* bufPtr, void* payload, uint8_t len) {
   	
   	if (len != sizeof(kyd_msg_t)) {
-  		//printf("ERR3\n");
+  		printf("ERR3\n");
   	} else {
   		kyd_msg_t* rcm = (kyd_msg_t*)payload;
+  		//printf("R %u from %u\n", rcm->msg_n, rcm->sender_id);
   		if (rcm->sender_id >= 0 && rcm->sender_id < MOTE_NUMBER+1) {
-  			//printf("ID %u R %u P %u\n", rcm->sender_id, rcm->msg_n, previous_msg_n[rcm->sender_id-1]);
   			if (rcm->msg_n == previous_msg_n[rcm->sender_id-1] + 1) { // check if consecutive
-  				if (counters[rcm->sender_id-1] == 255) { // to avoid false alarms when uint_8 restarts from 0, set it to 11 (no alarm)
+  				if (counters[rcm->sender_id-1] == 255) { // to avoid false alarms when uint_8 restarts from 0, set it to 11 (does not trigger the alarm)
   					counters[rcm->sender_id-1] = 11;
-  					printf("W %u %u\n", TOS_NODE_ID, rcm->sender_id); // WARNING : motes remained close for a while despite the alarm
+  					//printf("W %u %u\n", TOS_NODE_ID, rcm->sender_id); // WARNING : motes remained close for a while (2 minutes) despite the alarm
   				} else {
   					counters[rcm->sender_id-1] = counters[rcm->sender_id-1] + 1;
   					//printf("C %u\n", counters[rcm->sender_id-1]);
@@ -126,8 +128,9 @@ implementation {
   				counters[rcm->sender_id-1] = 0;
   			}
   			previous_msg_n[rcm->sender_id-1] = rcm->msg_n;
+  			printf("M %u R %u F %u\n", TOS_NODE_ID, rcm->msg_n, rcm->sender_id);
   		} else {
-  			//printf("ERR4 %u\n", rcm->sender_id); // mote ID not expected
+  			printf("ERR4 %u\n", rcm->sender_id); // mote ID not expected
   		}
   	}
   	return bufPtr;
