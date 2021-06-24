@@ -1,0 +1,6 @@
+3 motes
+Started with mote 1 and 3 in radio range while mote 2 out of radio ranges.
+First alarms can be seen in motes3_log.txt after the reception of the 10th message at 00:09:894 (triggered by mote 1) and at 00:10:359 (triggered by mote 3).
+
+At ~00:13 I moved mote 2 near 1 and 3.
+The 4 alarms can be seen at 00:18:013 (triggered by mote 1), 00:18:155 (triggered by mote 3), at 00:18.640 (triggered by mote 2 caused by mote 1) and at 00:18.642 (triggered by mote 2 caused by mote3)
