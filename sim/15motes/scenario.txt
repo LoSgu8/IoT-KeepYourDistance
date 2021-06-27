@@ -1,0 +1,2 @@
+15 randomly disposed and static motes
+Alarms can be found found at about 00:09 in 15motes_log.txt
