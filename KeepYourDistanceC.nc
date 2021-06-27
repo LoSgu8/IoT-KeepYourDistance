@@ -38,7 +38,7 @@ module KeepYourDistanceC @safe() {
 implementation {
 	message_t packet;
 	uint16_t previous_msg_n[MOTE_NUMBER]; // previous_msg_n[i-1] stores the last msg_n received from mote i
-	uint16_t n = 1; // local msg_n to be sent each time Timer fires
+	uint16_t n = 0; // local msg_n to be sent each time Timer fires
 	uint8_t counters[MOTE_NUMBER]; // counters[i-1] stores the number of consecutive msgs received from mote i
 	uint8_t i;
 	bool locked;
